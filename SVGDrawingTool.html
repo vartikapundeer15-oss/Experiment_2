@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SVG Drawing Tool (Working)</title>
+
+  <style>
+    * { box-sizing: border-box; }
+    body{
+      margin:0;
+      font-family: Arial, sans-serif;
+      background:#f2f4f8;
+      display:flex;
+      flex-direction:column;
+      min-height:100vh;
+    }
+
+    header{
+      padding:12px 14px;
+      background:#fff;
+      box-shadow:0 2px 8px rgba(0,0,0,0.08);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .tools{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    label{ font-weight:600; display:flex; gap:6px; align-items:center; }
+
+    select, button, input[type="color"]{
+      padding:8px 10px;
+      font-size:14px;
+      border:1px solid #cfd8dc;
+      border-radius:8px;
+      background:#fff;
+      cursor:pointer;
+    }
+
+    button{ border:none; background:#1976d2; color:#fff; }
+    button.secondary{ background:#546e7a; }
+    button.danger{ background:#d32f2f; }
+
+    .wrap{ padding:14px; flex:1; display:flex; justify-content:center; }
+    svg{
+      width: 92vw;
+      height: 72vh;
+      max-width: 1100px;
+      background:#fff;
+      border:2px solid #263238;
+      border-radius:12px;
+      cursor: crosshair;
+      touch-action: none; /* important for touch + pointer events */
+    }
+
+    .hint{ text-align:center; color:#455a64; font-size:13px; padding:0 14px 14px; }
+  </style>
+</head>
+
+<body>
+  <header>
+    <strong>SVG Drawing Tool</strong>
+
+    <div class="tools">
+      <label>
+        Shape
+        <select id="shape">
+          <option value="freehand">Freehand</option>
+          <option value="rect">Rectangle</option>
+          <option value="circle">Circle</option>
+          <option value="line">Line</option>
+        </select>
+      </label>
+
+      <label>
+        Color <input type="color" id="color" value="#000000" />
+      </label>
+
+      <label>
+        Stroke
+        <select id="stroke">
+          <option value="2">2px</option>
+          <option value="4">4px</option>
+          <option value="6">6px</option>
+          <option value="8">8px</option>
+        </select>
+      </label>
+
+      <button class="secondary" id="undo">Undo</button>
+      <button class="danger" id="clear">Clear</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <svg id="canvas"></svg>
+  </div>
+
+  <div class="hint">Drag to draw. Works with mouse + touch. Undo removes last shape.</div>
+
+  <script>
+    const svg = document.getElementById("canvas");
+    const shapeSel = document.getElementById("shape");
+    const colorSel = document.getElementById("color");
+    const strokeSel = document.getElementById("stroke");
+    const undoBtn = document.getElementById("undo");
+    const clearBtn = document.getElementById("clear");
+
+    const NS = "http://www.w3.org/2000/svg";
+
+    let drawing = false;
+    let startX = 0, startY = 0;
+    let currentEl = null;
+    const history = [];
+
+    // ✅ SUPER RELIABLE coordinate mapping
+    function getPointFromEvent(e){
+      const rect = svg.getBoundingClientRect();
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+    }
+
+    function pointerDown(e){
+      drawing = true;
+      svg.setPointerCapture(e.pointerId);
+
+      const p = getPointFromEvent(e);
+      startX = p.x; startY = p.y;
+
+      const mode = shapeSel.value;
+      const stroke = strokeSel.value;
+      const color = colorSel.value;
+
+      if(mode === "freehand"){
+        currentEl = document.createElementNS(NS, "path");
+        currentEl.setAttribute("fill", "none");
+        currentEl.setAttribute("stroke", color);
+        currentEl.setAttribute("stroke-width", stroke);
+        currentEl.setAttribute("stroke-linecap", "round");
+        currentEl.setAttribute("stroke-linejoin", "round");
+        currentEl.setAttribute("d", `M ${startX} ${startY}`);
+      }
+
+      if(mode === "rect"){
+        currentEl = document.createElementNS(NS, "rect");
+        currentEl.setAttribute("x", startX);
+        currentEl.setAttribute("y", startY);
+        currentEl.setAttribute("width", "0");
+        currentEl.setAttribute("height", "0");
+        currentEl.setAttribute("fill", "transparent");
+        currentEl.setAttribute("stroke", color);
+        currentEl.setAttribute("stroke-width", stroke);
+      }
+
+      if(mode === "circle"){
+        currentEl = document.createElementNS(NS, "circle");
+        currentEl.setAttribute("cx", startX);
+        currentEl.setAttribute("cy", startY);
+        currentEl.setAttribute("r", "0");
+        currentEl.setAttribute("fill", "transparent");
+        currentEl.setAttribute("stroke", color);
+        currentEl.setAttribute("stroke-width", stroke);
+      }
+
+      if(mode === "line"){
+        currentEl = document.createElementNS(NS, "line");
+        currentEl.setAttribute("x1", startX);
+        currentEl.setAttribute("y1", startY);
+        currentEl.setAttribute("x2", startX);
+        currentEl.setAttribute("y2", startY);
+        currentEl.setAttribute("stroke", color);
+        currentEl.setAttribute("stroke-width", stroke);
+        currentEl.setAttribute("stroke-linecap", "round");
+      }
+
+      svg.appendChild(currentEl);
+    }
+
+    function pointerMove(e){
+      if(!drawing || !currentEl) return;
+
+      const p = getPointFromEvent(e);
+      const mode = shapeSel.value;
+
+      if(mode === "freehand"){
+        const d = currentEl.getAttribute("d");
+        currentEl.setAttribute("d", `${d} L ${p.x} ${p.y}`);
+      }
+
+      if(mode === "rect"){
+        const x = Math.min(startX, p.x);
+        const y = Math.min(startY, p.y);
+        const w = Math.abs(p.x - startX);
+        const h = Math.abs(p.y - startY);
+        currentEl.setAttribute("x", x);
+        currentEl.setAttribute("y", y);
+        currentEl.setAttribute("width", w);
+        currentEl.setAttribute("height", h);
+      }
+
+      if(mode === "circle"){
+        const dx = p.x - startX;
+        const dy = p.y - startY;
+        const r = Math.sqrt(dx*dx + dy*dy);
+        currentEl.setAttribute("r", r);
+      }
+
+      if(mode === "line"){
+        currentEl.setAttribute("x2", p.x);
+        currentEl.setAttribute("y2", p.y);
+      }
+    }
+
+    function pointerUp(e){
+      if(!drawing) return;
+      drawing = false;
+
+      if(currentEl){
+        history.push(currentEl);
+        currentEl = null;
+      }
+    }
+
+    function undo(){
+      const last = history.pop();
+      if(last && last.parentNode === svg) svg.removeChild(last);
+    }
+
+    function clearAll(){
+      while(svg.firstChild) svg.removeChild(svg.firstChild);
+      history.length = 0;
+      currentEl = null;
+      drawing = false;
+    }
+
+    // ✅ Pointer events work for mouse + touch
+    svg.addEventListener("pointerdown", pointerDown);
+    svg.addEventListener("pointermove", pointerMove);
+    svg.addEventListener("pointerup", pointerUp);
+    svg.addEventListener("pointercancel", pointerUp);
+    svg.addEventListener("pointerleave", pointerUp);
+
+    undoBtn.addEventListener("click", undo);
+    clearBtn.addEventListener("click", clearAll);
+  </script>
+</body>
+</html>
