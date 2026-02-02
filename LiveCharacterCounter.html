@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Live Character Counter</title>
+
+    <!-- React 18 CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f2f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .counter-box {
+            background: white;
+            padding: 20px;
+            width: 350px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            font-size: 14px;
+            resize: none;
+            box-sizing: border-box;
+        }
+
+        .count {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        .limit {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel">
+    function CharacterCounter() {
+        const [text, setText] = React.useState("");
+        const maxLength = 100;
+
+        return (
+            <div className="counter-box">
+                <h3>Live Character Counter</h3>
+
+                <textarea
+                    maxLength={maxLength}
+                    placeholder="Start typing..."
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                ></textarea>
+
+                <div className="count">
+                    Characters: {text.length}/{maxLength}
+                    {text.length === maxLength && (
+                        <span className="limit"> (Limit reached)</span>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<CharacterCounter />);
+</script>
+
+</body>
+</html>
